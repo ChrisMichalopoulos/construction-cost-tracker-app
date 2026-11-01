@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+app_data/
+data_location.txt
+.streamlit/
+*.log
+.vscode/
