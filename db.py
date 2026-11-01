@@ -516,6 +516,10 @@ def df_transactions() -> pd.DataFrame:
         df.drop(columns=[c for c in ["transaction_id"] if c in df.columns], inplace=True)
 
         def pay_status(row):
+            if row["gross_amount"] < 0:
+                # A credit invoice (negative amount) isn't something you pay -
+                # it just reduces what you owe. No payment needed by default.
+                return "Credit" if row["paid_amount"] == 0 else "Credit (adjusted)"
             if row["paid_amount"] <= 0:
                 return "Unpaid"
             if row["paid_amount"] + 0.01 >= row["gross_amount"]:

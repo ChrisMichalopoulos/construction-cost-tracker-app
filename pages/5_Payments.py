@@ -17,6 +17,9 @@ if tx.empty:
     st.caption("No transactions yet. Add one on the **Transactions** page first.")
     st.stop()
 
+if "payment_editor_key_n" not in st.session_state:
+    st.session_state.payment_editor_key_n = 0
+
 # ---------------- Outstanding overview ----------------
 st.subheader("Outstanding balances")
 
@@ -73,6 +76,7 @@ with st.form("add_payment", clear_on_submit=True):
         new_payment_id = db.add_payment(selected_id, pay_date.isoformat(), pay_amount, pay_ref, pay_notes)
         for f in pay_files or []:
             db.add_attachment("payment", new_payment_id, f.name, f.getvalue())
+        st.session_state.payment_editor_key_n += 1  # force the grid to rebuild fresh - row positions may have shifted
         st.success("Payment recorded.")
         st.rerun()
 
@@ -93,7 +97,7 @@ else:
 
     edited = st.data_editor(
         edit_df,
-        key="payment_editor",
+        key=f"payment_editor_{selected_id}_{st.session_state.payment_editor_key_n}",
         hide_index=True,
         num_rows="dynamic",
         use_container_width=True,
@@ -118,6 +122,7 @@ else:
                 db.add_payment(selected_id, row["date"], float(row["amount"]), row.get("reference", "") or "", row.get("notes", "") or "")
             else:
                 db.update_payment(int(row["id"]), row["date"], float(row["amount"]), row.get("reference", "") or "", row.get("notes", "") or "")
+        st.session_state.payment_editor_key_n += 1  # force the grid to rebuild fresh on the next render
         st.success("Saved.")
         st.rerun()
 

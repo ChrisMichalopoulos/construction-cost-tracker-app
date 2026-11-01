@@ -17,7 +17,7 @@ All data is stored locally in a SQLite database. Nothing is sent anywhere.
 - [File attachments](#file-attachments)
 - [Accountant hand-off tracking](#accountant-hand-off-tracking)
 - [Backup](#backup)
-- [Moving the data to another device (OneDrive, etc.)](#moving-the-data-to-another-device-onedrive-etc)
+- [Changing where `app_data` lives](#changing-where-app_data-lives)
 - [Project structure](#project-structure)
 - [Tech stack](#tech-stack)
 
@@ -37,11 +37,11 @@ codes and cost types.
 Every cost in the project is classified along **three independent
 dimensions**, plus optionally a vendor:
 
-| Dimension | Answers | Examples | Managed on |
-|---|---|---|---|
-| **Primary cost code** | *Where* | Κτίριο (Building), Πισίνες (Pools), Εξωτερικός Χώρος (Exterior) | Cost Codes page |
+| Dimension                     | Answers                   | Examples                                                                                                                | Managed on      |
+| ----------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------- | --------------- |
+| **Primary cost code**   | *Where*                 | Κτίριο (Building), Πισίνες (Pools), Εξωτερικός Χώρος (Exterior)                             | Cost Codes page |
 | **Secondary cost code** | *What* (trade/material) | Μπετά, Σιδερά, Τοιχοποιία, Ηλεκτρολογικά, Υδραυλικά, Επενδύσεις... | Cost Codes page |
-| **Cost type** | *What kind* | Υλικά (Materials), Εργατικά (Labor), Εξοπλισμός (Equipment), Άλλο (Other) | Cost Codes page |
+| **Cost type**           | *What kind*             | Υλικά (Materials), Εργατικά (Labor), Εξοπλισμός (Equipment), Άλλο (Other)                    | Cost Codes page |
 
 The secondary cost code list is **shared** across all primary codes — e.g.
 "Μπετά" is one single entity, selectable under Building, Pools, or Exterior
@@ -65,15 +65,15 @@ On top of that:
 
 ## Pages
 
-| Page | Purpose |
-|---|---|
+| Page                        | Purpose                                                                                                                                                                                             |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Home** (`app.py`) | Dashboard: budget vs. actual vs. committed, by primary cost code and by secondary cost code; spend by cost type; cost-to-complete table; filterable by primary code, secondary code, and cost type. |
-| **Cost Codes** | Manage primary cost codes, secondary cost codes (with a default VAT rate each), and cost types. |
-| **Vendors** | Manage suppliers/subcontractors — name, type, phone, email, notes. |
-| **Budget** | Add/edit/delete budget lines; attach files (e.g. a quote) to a line. |
-| **Transactions** | Add/edit/delete actual and committed costs; search/filter; bulk "mark as given to accountant"; attach files (e.g. an invoice) to a transaction; export to CSV. |
-| **Payments** | Record payments against a transaction (supports partial payments); see outstanding balances; attach files (e.g. a bank transfer receipt) to a payment. |
-| **Backup** | Download a `.zip` of the database + every attached file. |
+| **Cost Codes**        | Manage primary cost codes, secondary cost codes (with a default VAT rate each), and cost types.                                                                                                     |
+| **Vendors**           | Manage suppliers/subcontractors — name, type, phone, email, notes.                                                                                                                                 |
+| **Budget**            | Add/edit/delete budget lines; attach files (e.g. a quote) to a line.                                                                                                                                |
+| **Transactions**      | Add/edit/delete actual and committed costs; search/filter; bulk "mark as given to accountant"; attach files (e.g. an invoice) to a transaction; export to CSV.                                      |
+| **Payments**          | Record payments against a transaction (supports partial payments); see outstanding balances; attach files (e.g. a bank transfer receipt) to a payment.                                              |
+| **Backup**            | Download a `.zip` of the database + every attached file.                                                                                                                                          |
 
 ## VAT handling
 
@@ -148,23 +148,56 @@ files whenever you want a snapshot, and save it somewhere else (a cloud
 drive, a USB stick). There's deliberately no one-click restore button — see
 the Backup page for manual restore instructions.
 
-## Moving the data to another device (OneDrive, etc.)
+## Changing where `app_data` lives
 
-By default, the database lives at `app_data/` next to the app's code. To
-point it somewhere else — e.g. a OneDrive-synced folder, so you can move
-between your own devices — either:
+By default, the database and attachments live at `app_data/` right next to
+the app's code (`db.py`'s folder). You can point the app at a different
+folder instead — e.g. a OneDrive-synced folder, a different drive, a NAS
+mount — without touching any code, using either of two methods. The app
+checks them in this order, falling back to the default `app_data/` if
+neither is set:
 
-- set the environment variable `COST_TRACKER_DATA_DIR` to the target folder, or
-- create a file named `data_location.txt` next to `db.py`, containing just
-  the folder path on one line.
+**Method 1 — a config file (simplest):**
 
-**Important caveat:** SQLite and cloud file-sync don't mix well under
-concurrent access. Only ever run the app on **one device at a time** — fully
-close it and wait for the sync client to finish before opening it on another
-device. This works fine as a way to move your working copy between your own
-computers; it is **not** a way to get true simultaneous multi-device access.
-For that, you'd run the app on one always-on machine and access it from
-other devices over the network/browser instead.
+1. Create a plain text file named `data_location.txt` in the same folder as `db.py`
+2. Put the full folder path on the first line, nothing else, e.g.:
+   ```
+   C:\Users\xrism\OneDrive\CostTrackerData
+   ```
+3. Restart the app — it will now read/write `tracker.db` and `attachments/`
+   under that folder instead of the local `app_data/`
+
+**Method 2 — an environment variable:**
+
+Set `COST_TRACKER_DATA_DIR` to the target folder before launching the app, e.g.:
+
+```
+set COST_TRACKER_DATA_DIR=C:\Users\xrism\OneDrive\CostTrackerData
+streamlit run app.py
+```
+
+(`data_location.txt` is simpler for a one-time setup; the environment
+variable is handy if you want to script the launch, e.g. from a `.bat` file.)
+
+**Moving existing data:** changing the path only changes where the app
+*looks* — it doesn't move your existing files for you. If you already have
+data in the local `app_data/`, move (not copy) `app_data/tracker.db` and
+`app_data/attachments/` into the new folder yourself before switching, so
+you don't end up with two separate databases.
+
+`data_location.txt` is specific to each computer (your laptop and desktop
+might use different drive letters/usernames), so it's excluded from git —
+create it separately on each device, pointing at the same shared folder if
+you're using one.
+
+**Important caveat if you point this at a cloud-synced folder (OneDrive,
+etc.):** SQLite and cloud file-sync don't mix well under concurrent access.
+Only ever run the app on **one device at a time** — fully close it and wait
+for the sync client to finish (green checkmark) before opening it on another
+device. This works fine as a way to move your single working copy between
+your own computers; it is **not** a way to get true simultaneous
+multi-device access. For that, you'd run the app on one always-on machine
+and access it from other devices over the network/browser instead.
 
 ## Project structure
 

@@ -27,6 +27,9 @@ primary_names = primary_codes["name"].tolist()
 code_names = codes["name"].tolist()
 type_names = ["— (whole cost code, not split)"] + types["name"].tolist()
 
+if "budget_editor_key_n" not in st.session_state:
+    st.session_state.budget_editor_key_n = 0
+
 # ---------------- Quick add ----------------
 st.subheader("Add a budget line")
 
@@ -70,6 +73,7 @@ if st.button("➕ Add budget line", type="primary"):
     for f in new_files or []:
         db.add_attachment("budget_line", new_id, f.name, f.getvalue())
     st.session_state.budget_upload_key_n += 1  # reset the uploader widget
+    st.session_state.budget_editor_key_n += 1  # force the grid to rebuild fresh - row positions may have shifted
     st.success("Budget line added.")
     st.rerun()
 
@@ -95,7 +99,7 @@ else:
 
     edited = st.data_editor(
         edit_df,
-        key="budget_editor",
+        key=f"budget_editor_{st.session_state.budget_editor_key_n}",
         hide_index=True,
         num_rows="dynamic",
         use_container_width=True,
@@ -155,6 +159,7 @@ else:
                     float(row["vat_rate"]) if pd.notna(row["vat_rate"]) else 0.24,
                     row.get("notes", "") or "",
                 )
+        st.session_state.budget_editor_key_n += 1  # force the grid to rebuild fresh on the next render
         st.success("Saved.")
         st.rerun()
 

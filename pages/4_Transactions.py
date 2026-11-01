@@ -34,6 +34,9 @@ vendor_names = ["—"] + vendors["name"].tolist()
 status_options = ["actual", "committed"]
 status_labels = {"actual": "Actual (invoiced)", "committed": "Committed (not yet invoiced)"}
 
+if "tx_editor_key_n" not in st.session_state:
+    st.session_state.tx_editor_key_n = 0
+
 # ==================== ADD ====================
 st.subheader("Add a transaction")
 
@@ -54,7 +57,10 @@ description = c6.text_input("Description")
 c7, c8, c9 = st.columns(3)
 quantity = c7.number_input("Quantity (optional)", min_value=0.0, value=0.0, step=1.0)
 unit = c8.text_input("Unit (optional)", value="")
-net_amount = c9.number_input("Net amount (before VAT)", min_value=0.0, value=0.0, step=1.0)
+net_amount = c9.number_input(
+    "Net amount (before VAT)", value=0.0, step=1.0,
+    help="Enter a negative number for a credit invoice (πιστωτικό) — a refund, discount, or returned goods.",
+)
 
 c10, c11, c12 = st.columns(3)
 vat_applicable = c10.checkbox("VAT applicable", value=True)
@@ -88,6 +94,7 @@ if st.button("➕ Add transaction", type="primary"):
     for f in new_files or []:
         db.add_attachment("transaction", new_id, f.name, f.getvalue())
     st.session_state.tx_upload_key_n += 1  # reset the uploader widget
+    st.session_state.tx_editor_key_n += 1  # force the grid to rebuild fresh - row positions just shifted
     st.success("Transaction added.")
     st.rerun()
 
@@ -119,8 +126,8 @@ f_primary = fr1[0].multiselect("Primary (where)", primary_filter_options, defaul
 f_codes = fr1[1].multiselect("Secondary (what)", code_names, default=code_names)
 f_types = fr1[2].multiselect("Cost type", type_names, default=type_names)
 f_status = fr1[3].multiselect("Status", status_options, default=status_options, format_func=lambda s: status_labels[s])
-f_pay = fr2[0].multiselect("Payment status", ["Unpaid", "Partially Paid", "Paid", "Overpaid"],
-                            default=["Unpaid", "Partially Paid", "Paid", "Overpaid"])
+payment_status_options = ["Unpaid", "Partially Paid", "Paid", "Overpaid", "Credit", "Credit (adjusted)"]
+f_pay = fr2[0].multiselect("Payment status", payment_status_options, default=payment_status_options)
 f_acct = fr2[1].multiselect("Given to accountant?", ["Given", "Not given"], default=["Given", "Not given"])
 f_search = fr2[2].text_input("Search (description / vendor / invoice)")
 
@@ -153,6 +160,7 @@ not_given_in_view = filtered[~filtered["given_to_accountant"].astype(bool)]
 if not not_given_in_view.empty:
     if st.button(f"📨 Mark these {len(not_given_in_view)} shown transactions as given to the accountant today"):
         db.set_given_to_accountant(not_given_in_view["id"].astype(int).tolist(), True)
+        st.session_state.tx_editor_key_n += 1  # force the grid to rebuild fresh with the updated values
         st.success(f"Marked {len(not_given_in_view)} transaction(s) as given to the accountant.")
         st.rerun()
 
@@ -170,7 +178,7 @@ edit_df = edit_df.rename(columns={"n": "files"})
 
 edited = st.data_editor(
     edit_df,
-    key="tx_editor",
+    key=f"tx_editor_{st.session_state.tx_editor_key_n}",
     hide_index=True,
     num_rows="dynamic",
     use_container_width=True,
@@ -241,6 +249,7 @@ if st.button("💾 Save changes", type="primary"):
         given = bool(row.get("given_to_accountant", False))
         given_date = (row.get("given_to_accountant_date", "") or "").strip() or None
         db.set_given_to_accountant([row_id], given, given_date if given else None)
+    st.session_state.tx_editor_key_n += 1  # force the grid to rebuild fresh on the next render
     st.success("Saved.")
     st.rerun()
 
